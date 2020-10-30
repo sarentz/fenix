@@ -24,6 +24,7 @@ import androidx.navigation.findNavController
 import androidx.navigation.fragment.navArgs
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.SwitchPreference
 import androidx.recyclerview.widget.RecyclerView
 import kotlinx.android.synthetic.main.amo_collection_override_dialog.view.*
 import kotlinx.coroutines.CoroutineScope
@@ -89,7 +90,8 @@ class SettingsFragment : PreferenceFragmentCompat() {
             scope = lifecycleScope,
             accountManager = requireComponents.backgroundServices.accountManager,
             httpClient = requireComponents.core.client,
-            updateFxASyncOverrideMenu = ::updateFxASyncOverrideMenu
+            updateFxASyncOverrideMenu = ::updateFxASyncOverrideMenu,
+            updateFxAUseLocalMenu = :: updateFxAUseLocalMenu
         )
 
         // Observe account changes to keep the UI up-to-date.
@@ -422,6 +424,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
         )?.isVisible = requireContext().settings().showSecretDebugMenuThisSession
 
         setupAmoCollectionOverridePreference(requireContext().settings())
+        setupUseLocalFxaServerPreference()
     }
 
     /**
@@ -508,6 +511,21 @@ class SettingsFragment : PreferenceFragmentCompat() {
         }
     }
 
+    private fun updateFxAUseLocalMenu() {
+        val settings = requireContext().settings()
+        val preferenceUseLocalFxAServer =
+            findPreference<SwitchPreference>(getPreferenceKey(R.string.pref_key_use_local_fxa_server))
+        val enabled =
+            requireComponents.backgroundServices.accountManager.authenticatedAccount() == null
+        val checked = settings.useLocalFxAServer
+        val visible = Config.channel.isMozillaOnline
+        preferenceUseLocalFxAServer?.apply {
+            isEnabled = enabled
+            isChecked = checked
+            isVisible = visible
+        }
+    }
+
     private fun updateFxASyncOverrideMenu() {
         val preferenceFxAOverride =
             findPreference<Preference>(getPreferenceKey(R.string.pref_key_override_fxa_server))
@@ -544,6 +562,31 @@ class SettingsFragment : PreferenceFragmentCompat() {
             isVisible = show
             summary = settings.overrideAmoCollection.ifEmpty { null }
         }
+    }
+
+    private fun setupUseLocalFxaServerPreference() {
+        val useLocalFxAServer = getPreferenceKey(R.string.pref_key_use_local_fxa_server)
+        val preferenceUseLocalFxAServer = findPreference<SwitchPreference>(useLocalFxAServer)
+        val visible = Config.channel.isMozillaOnline
+
+        preferenceUseLocalFxAServer?.apply {
+            isVisible = visible
+        }
+
+        preferenceUseLocalFxAServer?.onPreferenceChangeListener =
+            Preference.OnPreferenceChangeListener { preference, newValue ->
+                preference.context.settings().preferences.edit()
+                    .putBoolean(preference.key, newValue as Boolean).apply()
+                updateFxAUseLocalMenu()
+                Toast.makeText(
+                    context,
+                    getString(R.string.toast_override_fxa_sync_server_done),
+                    Toast.LENGTH_LONG
+                ).show()
+                Handler().postDelayed({
+                    exitProcess(0)
+                }, FXA_SYNC_OVERRIDE_EXIT_DELAY)
+            }
     }
 
     companion object {
