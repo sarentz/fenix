@@ -103,10 +103,11 @@ object TestHelper {
         }
     }
 
-    // Remove test file from the device Downloads folder
+    // Remove downloaded test files
     @Suppress("Deprecation")
     fun deleteDownloadFromStorage(fileName: String) {
         runBlocking {
+            // Remove test file from the device Downloads folder
             val downloadedFile = File(
                 Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
                 fileName
@@ -115,6 +116,10 @@ object TestHelper {
             if (downloadedFile.exists()) {
                 downloadedFile.delete()
             }
+
+            // Clears the app's database
+            val appContext = InstrumentationRegistry.getInstrumentation().targetContext
+            appContext.deleteDatabase("mozac_downloads_database")
         }
     }
 }
